@@ -53,6 +53,12 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 		return nil, fmt.Errorf("cannot create namespaceable rule interface: %v", err)
 	}
 	cd.ruleInterface = namespaceableRuleInterface.Namespace(namespace)
+	rule, err := cd.ruleInterface.Get(cd.rulename, metav1.GetOptions{})
+	if err != nil {
+		// In case of an error the controller allows a later loading based
+		// on an event.
+		cd.rule = rule
+	}
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect cluster: %v", err)
