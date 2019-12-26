@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: codis-acc
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: codis
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: codis
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: codis
+subjects:
+- kind: ServiceAccount
+  name: codis-acc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: codis
+spec:
+  selector:
+    matchLabels:
+      name: codis
+  template:
+    metadata:
+      labels:
+        name: codis
+    spec:
+      containers:
+      - name: codis
+        image: hub.docker.com/themue/codis:latest
+        imagePullPolicy: Always
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: RULE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      serviceAccountName: codis-acc
