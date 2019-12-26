@@ -167,7 +167,8 @@ func (cd *ConfigurationDistributor) handleConfigMap(evt watch.Event) error {
 	if !cd.matches(evt.Object, "configmap") {
 		return nil
 	}
-	return cd.copy(evt.Object, "core", "v1", "configmaps")
+	in := evt.Object.(*unstructured.Unstructured)
+	return cd.copy(in, "core", "v1", "configmaps")
 }
 
 // handleSecret cares for events regarding secrets. We only care for the
@@ -183,7 +184,8 @@ func (cd *ConfigurationDistributor) handleSecret(evt watch.Event) error {
 	if !cd.matches(evt.Object, "secret") {
 		return nil
 	}
-	return cd.copy(evt.Object, "core", "v1", "secrets")
+	in := evt.Object.(*unstructured.Unstructured)
+	return cd.copy(in, "core", "v1", "secrets")
 }
 
 // handleNamespace cares for events regarding namespaces. We only care for ADDED.
@@ -227,8 +229,7 @@ func (cd *ConfigurationDistributor) matches(object runtime.Object, kind string) 
 }
 
 // copy copies the objects to the namespace configured in the copier.
-func (cd *ConfigurationDistributor) copy(object runtime.Object, group, version, resource string) error {
-	in := object.(*unstructured.Unstructured)
+func (cd *ConfigurationDistributor) copy(in *unstructured.Unstructured, group, version, resource string) error {
 	client := cd.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    group,
 		Version:  version,
@@ -252,8 +253,39 @@ func (cd *ConfigurationDistributor) copy(object runtime.Object, group, version, 
 	return nil
 }
 
-// copyAll copies all config maps and secrets to the namespaces of the rule.
-func (cd *ConfigurationDistributor) copyAll() error {
-	// TODO Implement copy.
+// copyAllOf copies all resources of the given kind.
+func (cd *ConfigurationDistributor) copyAllOf(group, version, resource string) error {
+	// Client for the resource in own namespace.
+	client := cd.dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    group,
+		Version:  version,
+		Resource: resource,
+	}).Namespace(cd.namespace)
+	list, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("cannot retrieve %s in %s: %v", resource, cd.namespace, err)
+	}
+	// Copy all found resources.
+	for _, item := range list.Items {
+		in := &item
+		if err = cd.copy(in, group, version, resource); err != nil {
+			return err
+		}
+	}
 	return nil
 }
+
+// copyAll copies all config maps and secrets to the namespaces of the rule.
+func (cd *ConfigurationDistributor) copyAll() error {
+	err := cd.copyAllOf("core", "v1", "configmaps")
+	if err != nil {
+		return fmt.Errorf("cannot copy all configmaps: %v", err)
+	}
+	err = cd.copyAllOf("core", "v1", "secrets")
+	if err != nil {
+		return fmt.Errorf("cannot copy all secrets: %v", err)
+	}
+	return nil
+}
+
+// EOF
