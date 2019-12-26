@@ -69,27 +69,32 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 
 // Do executes the configuration distributor.
 func (cd *ConfigurationDistributor) Do() error {
-	// Create watches.
-	cdrWatch, err := cd.createWatch("k8s.tideland.dev", "v1alpha1", "configurationdistributionrules")
+	// Create watches, restrict CDR, config map, and secret to
+	// namespace of the rule. Watch for namespaces is open to
+	// see if it's one of the configured namespaces.
+	opts := metav1.ListOptions{
+		FieldSelector: "metadata.namespace=" + cd.namespace,
+	}
+	cdrWatch, err := cd.createWatch("k8s.tideland.dev", "v1alpha1", "configurationdistributionrules", opts)
 	if err != nil {
 		return fmt.Errorf("cannot create ConfigurationDistributionRule watch: %v", err)
 	}
-	cmWatch, err := cd.createWatch("core", "v1", "configmaps")
+	cmWatch, err := cd.createWatch("core", "v1", "configmaps", opts)
 	if err != nil {
 		return fmt.Errorf("cannot create ConfigMap watch: %v", err)
 	}
-	secretWatch, err := cd.createWatch("core", "v1", "secrets")
+	secretWatch, err := cd.createWatch("core", "v1", "secrets", opts)
 	if err != nil {
 		return fmt.Errorf("cannot create Secret watch: %v", err)
 	}
-	nsWatch, err := cd.createWatch("core", "v1", "namespaces")
+	nsWatch, err := cd.createWatch("core", "v1", "namespaces", metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("cannot create Namespaces watch: %v", err)
 	}
 	// Also listen to interrupt signal.
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, os.Interrupt)
-	// Wait for events.
+	// Wait for events and handle.
 	for {
 		select {
 		case <-stopChan:
@@ -110,14 +115,19 @@ func (cd *ConfigurationDistributor) Do() error {
 }
 
 // createWatch simplifies creates a watch based on group, version, and resource.
-func (cd *ConfigurationDistributor) createWatch(group, version, resource string) (watch.Interface, error) {
+func (cd *ConfigurationDistributor) createWatch(
+	group string,
+	version string,
+	resource string,
+	opts metav1.ListOptions,
+) (watch.Interface, error) {
 	gvr := schema.GroupVersionResource{
 		Group:    group,
 		Version:  version,
 		Resource: resource,
 	}
 	nri := cd.dynamicClient.Resource(gvr)
-	return nri.Watch(metav1.ListOptions{})
+	return nri.Watch(opts)
 }
 
 // handleConfigurationDistributionRule cares for events regarding the CDRs. We only care for the
@@ -127,7 +137,7 @@ func (cd *ConfigurationDistributor) handleConfigurationDistributionRule(evt watc
 		return nil
 	}
 	unstructuredObject := evt.Object.(*unstructured.Unstructured)
-	if unstructuredObject.GetNamespace() != cd.namespace || unstructuredObject.GetName() != cd.rulename {
+	if unstructuredObject.GetName() != cd.rulename {
 		return nil
 	}
 	if evt.Type == watch.Deleted {
@@ -147,7 +157,7 @@ func (cd *ConfigurationDistributor) handleConfigurationDistributionRule(evt watc
 // handleConfigMap cares for events regarding config maps. We only care for the
 // types ADDED and MODIFIED. Here config maps are copied to all configured
 // namespaces.
-func (cd *ConfigurationDistributor) handleConfigMap(evt watch.Event) {
+func (cd *ConfigurationDistributor) handleConfigMap(evt watch.Event) error {
 	if cd.rule == nil {
 		return nil
 	}
@@ -185,7 +195,7 @@ func (cd *ConfigurationDistributor) handleNamespace(evt watch.Event) error {
 	if evt.Type != watch.Added {
 		return nil
 	}
-	unstructuredObject := object.(*unstructured.Unstructured)
+	unstructuredObject := evt.Object.(*unstructured.Unstructured)
 	isNamespace := false
 	for _, namespace := range cd.rule.Spec.Namespaces {
 		if unstructuredObject.GetNamespace() == namespace {
@@ -204,11 +214,6 @@ func (cd *ConfigurationDistributor) matches(object runtime.Object, kind string) 
 	unstructuredObject := object.(*unstructured.Unstructured)
 	if cd.rule.Spec.Kind != kind && cd.rule.Spec.Kind != "both" {
 		// Kind is wrong.
-		return false
-	}
-	// Namespace.
-	if cd.rule.ObjectMeta.Namespace != unstructuredObject.GetNamespace() {
-		// Namespace does not match.
 		return false
 	}
 	// Selector.

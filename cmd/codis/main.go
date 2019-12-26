@@ -25,7 +25,7 @@ import (
 //--------------------
 
 func main() {
-	log.Infof("Starting the Tideland Configuration Distributor for Kubernetes (CoDis) ...")
+	log.Printf("Starting the Tideland Configuration Distributor for Kubernetes (CoDis) ...")
 
 	// Namespace and rulename.
 	namespace := os.Getenv("NAMESPACE")
@@ -49,13 +49,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot init configuration distributor: %v", err)
 	}
-	log.Infof("Run the configuration distributor ...")
+	log.Printf("Run the configuration distributor ...")
 	err = cd.Do()
 	if err != nil {
 		log.Fatalf("Error during running the configuration distributor: %v", err)
 	}
 
-	log.Infof("Done!")
+	log.Printf("Done!")
 }
 
 // EOF
