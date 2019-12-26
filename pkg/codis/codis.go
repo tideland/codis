@@ -190,6 +190,7 @@ func (cd *ConfigurationDistributor) handleSecret(evt watch.Event) error {
 
 // handleNamespace cares for events regarding namespaces. We only care for ADDED.
 // Here the config maps and secrets are copied to all configured namespaces.
+// TODO Not yet optimal, distributes too broad.
 func (cd *ConfigurationDistributor) handleNamespace(evt watch.Event) error {
 	if cd.rule == nil {
 		return nil
