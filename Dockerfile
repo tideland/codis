@@ -2,22 +2,20 @@
 ## Build codis binary.
 ##
 FROM golang:1.13 AS build
-COPY go.mod /src/
-COPY go.sum /src/
 RUN mkdir /gocache
 ENV GO111MODULE=on
 ENV GOPROXY=https://proxy.golang.org
-RUN cd /src && go mod download
-COPY cmd /src/cmd
-COPY pkg /src/pkg
-RUN cd /src && go build -mod=readonly ./cmd/codis
+ENV CGO_ENABLED=0
+WORKDIR /app
+COPY . /app
+RUN cd /app/cmd/codis && go build ./...
 
 ##
 ## Build runtime image.
 ##
-FROM golang:1.13
+FROM alpine AS production
 WORKDIR /usr/bin
-COPY --from=build /src/cmd/codis .
+COPY --from=build /app/cmd/codis/codis .
 ENV NAMESPACE=default RULENAME=default-rule
 ENTRYPOINT ["/usr/bin/codis"]
 
