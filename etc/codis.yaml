@@ -1,7 +1,7 @@
-apiVersion: apiextensions.k8s.io/v1
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: codis.tideland.dev
+  name: configurationdistributionrules.k8s.tideland.dev
 spec:
   group: k8s.tideland.dev
   versions:
@@ -20,16 +20,14 @@ spec:
   validation:
     openAPIV3Schema:
       type: object
-      spec:
-        type: object
-        properties:
-          kind:
+      properties:
+        kind:
+          type: string
+          pattern: '^(configmap|secret|both)$'
+        namespaces:
+          type: array
+          items:
             type: string
-            pattern: '^(configmap|secret|both)$'
-          namespaces:
-            type: array
-            items:
-              type: string
-          selector:
-            type: string
-            pattern: '^\w$'
+        selector:
+          type: string
+          pattern: '^\w$'
