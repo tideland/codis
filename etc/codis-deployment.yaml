@@ -43,8 +43,8 @@ spec:
     spec:
       containers:
       - name: codis
-        image: hub.docker.com/themue/codis:latest
-        imagePullPolicy: IfNotPresent
+        image: themue/codis
+        imagePullPolicy: Always
         env:
         - name: NAMESPACE
           valueFrom:

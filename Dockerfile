@@ -4,15 +4,23 @@
 FROM golang:1.13 AS build
 COPY go.mod /src/
 COPY go.sum /src/
+RUN mkdir /gocache
+ENV GO111MODULE=on
+ENV GOPROXY=https://proxy.golang.org
 RUN cd /src && go mod download
 COPY cmd /src/cmd
 COPY pkg /src/pkg
-RUN cd /src && go build -mod=readonly -o /usr/local/bin/codis ./cmd/codis
+RUN cd /src && go build -mod=readonly ./cmd/codis
+
 ##
 ## Build runtime image.
 ##
-FROM gcr.io/distroless/static:nonroot
-USER nobody
-COPY --from=build /usr/local/bin/codis /usr/local/bin/codis
+FROM golang:1.13
+WORKDIR /usr/bin
+COPY --from=build /src/cmd/codis .
 ENV NAMESPACE=default RULENAME=default-rule
-ENTRYPOINT ["/usr/local/bin/codis"]
+ENTRYPOINT ["/usr/bin/codis"]
+
+##
+## EOF
+##
