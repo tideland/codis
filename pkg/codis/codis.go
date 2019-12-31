@@ -149,7 +149,7 @@ func (cd *ConfigurationDistributor) addConfigMapHandler(obj interface{}) {
 			return
 		}
 	}
-	cd.copyConfigMap(cm)
+	cd.applyConfigMap(cm, true)
 }
 
 // updateConfigMapHandler handles the updating of ConfigMaps.
@@ -166,21 +166,26 @@ func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interf
 			return
 		}
 	}
-	cd.copyConfigMap(cm)
+	cd.applyConfigMap(cm, false)
 }
 
-// copyConfigMap copies the ConfigMap to the namespaces configured in the distributor.
-func (cd *ConfigurationDistributor) copyConfigMap(in *corev1.ConfigMap) {
-	log.Printf("copying 'configmap/%s' ...", in.GetName())
+// applyConfigMap applies the ConfigMap to the namespaces configured in the distributor.
+func (cd *ConfigurationDistributor) applyConfigMap(in *corev1.ConfigMap, create bool) {
+	log.Printf("applying 'configmap/%s' ...", in.GetName())
 	for _, namespace := range cd.rule.Spec.Namespaces {
 		cmInf := cd.client.CoreV1().ConfigMaps(namespace)
 		out := in.DeepCopy()
 		out.SetNamespace(namespace)
 
-		_, err := cmInf.Create(out)
+		var err error
+		if create {
+			_, err = cmInf.Create(out)
+		} else {
+			_, err = cmInf.Update(out)
+		}
 		if err != nil {
 			log.Printf(
-				"cannot create 'configmap/%s' in namespace '%s': %v",
+				"cannot apply 'configmap/%s' to namespace '%s': %v",
 				in.GetName(),
 				namespace,
 				err,
@@ -203,7 +208,7 @@ func (cd *ConfigurationDistributor) addSecretHandler(obj interface{}) {
 			return
 		}
 	}
-	cd.copySecret(scrt)
+	cd.applySecret(scrt, true)
 }
 
 // updateSecretHandler handles the updating of Secrets.
@@ -220,21 +225,26 @@ func (cd *ConfigurationDistributor) updateSecretHandler(oldobj, newobj interface
 			return
 		}
 	}
-	cd.copySecret(scrt)
+	cd.applySecret(scrt, false)
 }
 
-// copySecret copies the Secret to the namespaces configured in the distributor.
-func (cd *ConfigurationDistributor) copySecret(in *corev1.Secret) {
-	log.Printf("copying 'secret/%s' ...", in.GetName())
+// applySecret applies the Secret to the namespaces configured in the distributor.
+func (cd *ConfigurationDistributor) applySecret(in *corev1.Secret, create bool) {
+	log.Printf("applying 'secret/%s' ...", in.GetName())
 	for _, namespace := range cd.rule.Spec.Namespaces {
 		scrtInf := cd.client.CoreV1().Secrets(namespace)
 		out := in.DeepCopy()
 		out.SetNamespace(namespace)
 
-		_, err := scrtInf.Create(out)
+		var err error
+		if create {
+			_, err = scrtInf.Create(out)
+		} else {
+			_, err = scrtInf.Update(out)
+		}
 		if err != nil {
 			log.Printf(
-				"cannot create 'secret/%s' in namespace '%s': %v",
+				"cannot apply 'secret/%s' to namespace '%s': %v",
 				in.GetName(),
 				namespace,
 				err,
