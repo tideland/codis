@@ -171,6 +171,7 @@ func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interf
 
 // copyConfigMap copies the ConfigMap to the namespaces configured in the distributor.
 func (cd *ConfigurationDistributor) copyConfigMap(in *corev1.ConfigMap) {
+	log.Printf("copying 'configmap/%s' ...", in.GetName())
 	for _, namespace := range cd.rule.Spec.Namespaces {
 		cmInf := cd.client.CoreV1().ConfigMaps(namespace)
 		out := in.DeepCopy()
@@ -224,6 +225,7 @@ func (cd *ConfigurationDistributor) updateSecretHandler(oldobj, newobj interface
 
 // copySecret copies the Secret to the namespaces configured in the distributor.
 func (cd *ConfigurationDistributor) copySecret(in *corev1.Secret) {
+	log.Printf("copying 'secret/%s' ...", in.GetName())
 	for _, namespace := range cd.rule.Spec.Namespaces {
 		scrtInf := cd.client.CoreV1().Secrets(namespace)
 		out := in.DeepCopy()
