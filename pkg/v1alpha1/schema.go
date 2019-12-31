@@ -95,7 +95,7 @@ type ConfigurationDistributionRuleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	ConfigurationDistributionRules []ConfigurationDistributionRule `json:"rules"`
+	Items []ConfigurationDistributionRule `json:"items"`
 }
 
 // DeepCopyObject returns a generically typed copy of a rule list.
@@ -104,10 +104,10 @@ func (in *ConfigurationDistributionRuleList) DeepCopyObject() runtime.Object {
 	out.TypeMeta = in.TypeMeta
 	out.ListMeta = in.ListMeta
 
-	if in.ConfigurationDistributionRules != nil {
-		out.ConfigurationDistributionRules = make([]ConfigurationDistributionRule, len(in.ConfigurationDistributionRules))
-		for i := range in.ConfigurationDistributionRules {
-			in.ConfigurationDistributionRules[i].DeepCopyInto(&out.ConfigurationDistributionRules[i])
+	if in.Items != nil {
+		out.Items = make([]ConfigurationDistributionRule, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
 		}
 	}
 

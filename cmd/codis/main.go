@@ -12,12 +12,15 @@ package main // import "tideland.dev/codis/cmd/codis"
 //--------------------
 
 import (
+	"flag"
 	"log"
-	"os"
-	"path/filepath"
 
-	"k8s.io/client-go/tools/clientcmd"
 	"tideland.dev/codis/pkg/codis"
+	codisv1alpha1 "tideland.dev/codis/pkg/v1alpha1"
+
+	"k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 //--------------------
@@ -25,21 +28,22 @@ import (
 //--------------------
 
 func main() {
-	log.Printf("Starting the Tideland Configuration Distributor for Kubernetes (CoDis) ...")
-
-	// Namespace and rulename.
-	namespace := os.Getenv("NAMESPACE")
-	if namespace == "" {
-		namespace = "default"
-	}
-	rulename := os.Getenv("RULENAME")
-	if rulename == "" {
-		rulename = "default-rule"
-	}
+	log.Printf("Starting the Tideland Configuration Distributor (CoDis) ...")
 
 	// Configuration.
-	cfgFilename := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	config, err := clientcmd.BuildConfigFromFlags("", cfgFilename)
+	var (
+		kubeconfig string
+		masterURL  string
+		namespace  string
+		rulename   string
+	)
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&namespace, "namespace", "default", "Namespace of the managed configuration distributor rule.")
+	flag.StringVar(&rulename, "rulename", "default-rule", "Name of the managed configuration distributor rule.")
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
 		log.Fatalf("Cannot read controller configuration: %v", err)
 	}
@@ -49,13 +53,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot init configuration distributor: %v", err)
 	}
-	log.Printf("Run the configuration distributor ...")
-	err = cd.Do()
-	if err != nil {
-		log.Fatalf("Error during running the configuration distributor: %v", err)
-	}
+	codisv1alpha1.AddToScheme(scheme.Scheme)
 
-	log.Printf("Done!")
+	log.Printf("Run the configuration distributor ...")
+	cd.Go()
+
+	// Run forever.
+	select {}
 }
 
 // EOF

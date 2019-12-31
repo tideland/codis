@@ -21,7 +21,7 @@ import (
 )
 
 //--------------------
-// INTERFACES
+// RULE INTERFACE
 //--------------------
 
 // RuleInterface defines the interface to access a rule.
@@ -31,46 +31,6 @@ type RuleInterface interface {
 	Create(copier *ConfigurationDistributionRule, opts metav1.CreateOptions) (*ConfigurationDistributionRule, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 }
-
-// NamespaceableRuleInterface defines the interface to access a rule in a namespace.
-type NamespaceableRuleInterface interface {
-	Namespace(namespace string) RuleInterface
-}
-
-// namespaceableRuleInterface implements NamespaceableRuleInterface.
-type namespaceableRuleInterface struct {
-	restClient rest.Interface
-}
-
-// NewForConfig creates a client for accessing the rules in a namespace.
-func NewForConfig(config *rest.Config) (NamespaceableRuleInterface, error) {
-	crdConfig := *config
-	crdConfig.ContentConfig.GroupVersion = &schema.GroupVersion{Group: groupName, Version: groupVersion}
-	crdConfig.APIPath = "/apis"
-	crdConfig.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: scheme.Codecs}
-	crdConfig.UserAgent = rest.DefaultKubernetesUserAgent()
-
-	restClient, err := rest.UnversionedRESTClientFor(&crdConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return &namespaceableRuleInterface{
-		restClient: restClient,
-	}, nil
-}
-
-// Namespace implements the NamespaceableRuleInterface.
-func (nri *namespaceableRuleInterface) Namespace(namespace string) RuleInterface {
-	return &ruleInterface{
-		restClient: nri.restClient,
-		namespace:  namespace,
-	}
-}
-
-//--------------------
-// RULE INTERFACE IMPLEMENTATION
-//--------------------
 
 // ruleInterface implements ConfigurationDistributionRuleInterface.
 type ruleInterface struct {
@@ -131,6 +91,46 @@ func (ri *ruleInterface) Watch(opts metav1.ListOptions) (watch.Interface, error)
 		Resource("configurationdistributionrules").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
+}
+
+//--------------------
+// NAMESPACEABLE RULE INTERFACE
+//--------------------
+
+// NamespaceableRuleInterface defines the interface to access a rule in a namespace.
+type NamespaceableRuleInterface interface {
+	Namespace(namespace string) RuleInterface
+}
+
+// namespaceableRuleInterface implements NamespaceableRuleInterface.
+type namespaceableRuleInterface struct {
+	restClient rest.Interface
+}
+
+// NewForConfig creates a client for accessing the rules in a namespace.
+func NewForConfig(config *rest.Config) (NamespaceableRuleInterface, error) {
+	crdConfig := *config
+	crdConfig.ContentConfig.GroupVersion = &schema.GroupVersion{Group: groupName, Version: groupVersion}
+	crdConfig.APIPath = "/apis"
+	crdConfig.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: scheme.Codecs}
+	crdConfig.UserAgent = rest.DefaultKubernetesUserAgent()
+
+	restClient, err := rest.UnversionedRESTClientFor(&crdConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &namespaceableRuleInterface{
+		restClient: restClient,
+	}, nil
+}
+
+// Namespace implements the NamespaceableRuleInterface.
+func (nri *namespaceableRuleInterface) Namespace(namespace string) RuleInterface {
+	return &ruleInterface{
+		restClient: nri.restClient,
+		namespace:  namespace,
+	}
 }
 
 // EOF

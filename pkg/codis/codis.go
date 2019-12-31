@@ -13,18 +13,18 @@ package codis // import "tideland.dev/codis/pkg/codis"
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
+	"log"
+	"time"
 
 	codisv1alpha1 "tideland.dev/codis/pkg/v1alpha1"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 //--------------------
@@ -34,11 +34,15 @@ import (
 // ConfigurationDistributor implements the configuration distribution engine.
 type ConfigurationDistributor struct {
 	config        *rest.Config
+	client        kubernetes.Interface
 	namespace     string
 	rulename      string
 	ruleInterface codisv1alpha1.RuleInterface
-	dynamicClient dynamic.Interface
 	rule          *codisv1alpha1.ConfigurationDistributionRule
+	ruleInformer  cache.SharedIndexInformer
+	cmInformer    cache.SharedIndexInformer
+	scrtInformer  cache.SharedIndexInformer
+	nsInformer    cache.SharedIndexInformer
 }
 
 // New creates a new configuration distribution engine.
@@ -48,6 +52,7 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 		namespace: namespace,
 		rulename:  rulename,
 	}
+	// Init rule interface.
 	namespaceableRuleInterface, err := codisv1alpha1.NewForConfig(cd.config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create namespaceable rule interface: %v", err)
@@ -59,234 +64,194 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 		// on an event.
 		cd.rule = rule
 	}
-	dynamicClient, err := dynamic.NewForConfig(config)
+	// Init client.
+	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect cluster: %v", err)
 	}
-	cd.dynamicClient = dynamicClient
+	cd.client = client
+	// Init informers.
+	cd.ruleInformer = codisv1alpha1.NewRuleInformerWithInterface(cd.ruleInterface).Informer()
+	factory := informers.NewSharedInformerFactory(cd.client, time.Second*30)
+	cd.cmInformer = factory.Core().V1().ConfigMaps().Informer()
+	cd.scrtInformer = factory.Core().V1().Secrets().Informer()
+	cd.nsInformer = factory.Core().V1().Namespaces().Informer()
 	return cd, nil
 }
 
-// Do executes the configuration distributor.
-func (cd *ConfigurationDistributor) Do() error {
-	// Create watches, restrict CDR, config map, and secret to
-	// namespace of the rule. Watch for namespaces is open to
-	// see if it's one of the configured namespaces.
-	opts := metav1.ListOptions{
-		FieldSelector: "metadata.namespace=" + cd.namespace,
-	}
-	cdrWatch, err := cd.createWatch("k8s.tideland.dev", "v1alpha1", "configurationdistributionrules", opts)
-	if err != nil {
-		return fmt.Errorf("cannot create ConfigurationDistributionRule watch: %v", err)
-	}
-	cmWatch, err := cd.createWatch("core", "v1", "configmaps", opts)
-	if err != nil {
-		return fmt.Errorf("cannot create ConfigMap watch: %v", err)
-	}
-	secretWatch, err := cd.createWatch("core", "v1", "secrets", opts)
-	if err != nil {
-		return fmt.Errorf("cannot create Secret watch: %v", err)
-	}
-	nsWatch, err := cd.createWatch("core", "v1", "namespaces", metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("cannot create Namespaces watch: %v", err)
-	}
-	// Also listen to interrupt signal.
-	stopChan := make(chan os.Signal, 1)
-	signal.Notify(stopChan, os.Interrupt)
-	// Wait for events and handle.
-	for {
-		select {
-		case <-stopChan:
-			return nil
-		case evt := <-cdrWatch.ResultChan():
-			err = cd.handleConfigurationDistributionRule(evt)
-		case evt := <-cmWatch.ResultChan():
-			err = cd.handleConfigMap(evt)
-		case evt := <-secretWatch.ResultChan():
-			err = cd.handleSecret(evt)
-		case evt := <-nsWatch.ResultChan():
-			err = cd.handleNamespace(evt)
-		}
-		if err != nil {
-			return fmt.Errorf("cannot handle event: %v", err)
-		}
-	}
-}
-
-// createWatch simplifies creates a watch based on group, version, and resource.
-func (cd *ConfigurationDistributor) createWatch(
-	group string,
-	version string,
-	resource string,
-	opts metav1.ListOptions,
-) (watch.Interface, error) {
-	gvr := schema.GroupVersionResource{
-		Group:    group,
-		Version:  version,
-		Resource: resource,
-	}
-	nri := cd.dynamicClient.Resource(gvr)
-	return nri.Watch(opts)
-}
-
-// handleConfigurationDistributionRule cares for events regarding the CDRs. We only care for the
-// types ADDED, MODIFIED, and DELETED.
-func (cd *ConfigurationDistributor) handleConfigurationDistributionRule(evt watch.Event) error {
-	if evt.Type != watch.Added && evt.Type != watch.Modified && evt.Type != watch.Deleted {
-		return nil
-	}
-	unstructuredObject := evt.Object.(*unstructured.Unstructured)
-	if unstructuredObject.GetName() != cd.rulename {
-		return nil
-	}
-	if evt.Type == watch.Deleted {
-		// Simple case of deleting the rule.
-		cd.rule = nil
-		return nil
-	}
-	// Add or update rule.
-	rule, err := cd.ruleInterface.Get(cd.rulename, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("cannot get configuration distribution rule '%s': %v", cd.rulename, err)
-	}
-	cd.rule = rule
-	return cd.copyAll()
-}
-
-// handleConfigMap cares for events regarding config maps. We only care for the
-// types ADDED and MODIFIED. Here config maps are copied to all configured
-// namespaces.
-func (cd *ConfigurationDistributor) handleConfigMap(evt watch.Event) error {
-	if cd.rule == nil {
-		return nil
-	}
-	if evt.Type != watch.Added && evt.Type != watch.Modified {
-		return nil
-	}
-	if !cd.matches(evt.Object, "configmap") {
-		return nil
-	}
-	in := evt.Object.(*unstructured.Unstructured)
-	return cd.copy(in, "core", "v1", "configmaps")
-}
-
-// handleSecret cares for events regarding secrets. We only care for the
-// types ADDED and MODIFIED. Here secrets are copied to all configured
-// namespaces.
-func (cd *ConfigurationDistributor) handleSecret(evt watch.Event) error {
-	if cd.rule == nil {
-		return nil
-	}
-	if evt.Type != watch.Added && evt.Type != watch.Modified {
-		return nil
-	}
-	if !cd.matches(evt.Object, "secret") {
-		return nil
-	}
-	in := evt.Object.(*unstructured.Unstructured)
-	return cd.copy(in, "core", "v1", "secrets")
-}
-
-// handleNamespace cares for events regarding namespaces. We only care for ADDED.
-// Here the config maps and secrets are copied to all configured namespaces.
-// TODO Not yet optimal, distributes too broad.
-func (cd *ConfigurationDistributor) handleNamespace(evt watch.Event) error {
-	if cd.rule == nil {
-		return nil
-	}
-	if evt.Type != watch.Added {
-		return nil
-	}
-	unstructuredObject := evt.Object.(*unstructured.Unstructured)
-	isNamespace := false
-	for _, namespace := range cd.rule.Spec.Namespaces {
-		if unstructuredObject.GetNamespace() == namespace {
-			isNamespace = true
-		}
-	}
-	if isNamespace {
-		return cd.copyAll()
-	}
-	return nil
-}
-
-// matches checks if the event matches to our copier.
-func (cd *ConfigurationDistributor) matches(object runtime.Object, kind string) bool {
-	// Kind.
-	unstructuredObject := object.(*unstructured.Unstructured)
-	if cd.rule.Spec.Kind != kind && cd.rule.Spec.Kind != "both" {
-		// Kind is wrong.
-		return false
-	}
-	// Selector.
-	if cd.rule.Spec.Selector != "" {
-		if unstructuredObject.GetLabels()["rule"] != cd.rule.Spec.Selector {
-			// Rule-selector doesn't match to labels.
-			return false
-		}
-	}
-	return true
-}
-
-// copy copies the objects to the namespace configured in the copier.
-func (cd *ConfigurationDistributor) copy(in *unstructured.Unstructured, group, version, resource string) error {
-	client := cd.dynamicClient.Resource(schema.GroupVersionResource{
-		Group:    group,
-		Version:  version,
-		Resource: resource,
+// Go executes the configuration distributor.
+func (cd *ConfigurationDistributor) Go() {
+	cd.ruleInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    cd.mkAddRuleHandler(),
+		UpdateFunc: cd.mkUpdateRuleHandler(),
+		DeleteFunc: cd.mkDeleteRuleHandler(),
 	})
+	cd.cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    cd.addConfigMapHandler,
+		UpdateFunc: cd.updateConfigMapHandler,
+	})
+	cd.scrtInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    cd.addSecretHandler,
+		UpdateFunc: cd.updateSecretHandler,
+	})
+
+	go cd.ruleInformer.Run(wait.NeverStop)
+	go cd.cmInformer.Run(wait.NeverStop)
+	go cd.scrtInformer.Run(wait.NeverStop)
+}
+
+// mkAddRuleHandler creates the handler for added rules.
+func (cd *ConfigurationDistributor) mkAddRuleHandler() func(obj interface{}) {
+	return func(obj interface{}) {
+		rule := obj.(*codisv1alpha1.ConfigurationDistributionRule)
+		if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+			return
+		}
+		cd.rule = rule
+		cd.copyAll()
+	}
+}
+
+// mkUpdateRuleHandler creates the handler for updated rules.
+func (cd *ConfigurationDistributor) mkUpdateRuleHandler() func(oldObj, newObj interface{}) {
+	return func(oldObj, newObj interface{}) {
+		rule := newObj.(*codisv1alpha1.ConfigurationDistributionRule)
+		if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+			return
+		}
+		cd.rule = rule
+		cd.copyAll()
+	}
+}
+
+// mkDeleteRuleHandler creates the handler for deleted rules.
+func (cd *ConfigurationDistributor) mkDeleteRuleHandler() func(obj interface{}) {
+	return func(obj interface{}) {
+		rule := obj.(*codisv1alpha1.ConfigurationDistributionRule)
+		if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+			return
+		}
+		cd.rule = nil
+	}
+}
+
+// addConfigMapHandler handles the adding of ConfigMaps.
+func (cd *ConfigurationDistributor) addConfigMapHandler(obj interface{}) {
+	if cd.rule == nil {
+		return
+	}
+	if cd.rule.Spec.Kind != "configmap" && cd.rule.Spec.Kind != "both" {
+		return
+	}
+	cm := obj.(*corev1.ConfigMap)
+	if cd.rule.Spec.Selector != "" {
+		if cm.GetLabels()["rule"] != cd.rule.Spec.Selector {
+			return
+		}
+	}
+	cd.copyConfigMap(cm)
+}
+
+// updateConfigMapHandler handles the updating of ConfigMaps.
+func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interface{}) {
+	if cd.rule == nil {
+		return
+	}
+	if cd.rule.Spec.Kind != "configmap" && cd.rule.Spec.Kind != "both" {
+		return
+	}
+	cm := newobj.(*corev1.ConfigMap)
+	if cd.rule.Spec.Selector != "" {
+		if cm.GetLabels()["rule"] != cd.rule.Spec.Selector {
+			return
+		}
+	}
+	cd.copyConfigMap(cm)
+}
+
+// copyConfigMap copies the ConfigMap to the namespaces configured in the distributor.
+func (cd *ConfigurationDistributor) copyConfigMap(in *corev1.ConfigMap) {
 	for _, namespace := range cd.rule.Spec.Namespaces {
+		cmInf := cd.client.CoreV1().ConfigMaps(namespace)
 		out := in.DeepCopy()
 		out.SetNamespace(namespace)
 
-		_, err := client.Create(out, metav1.CreateOptions{})
+		_, err := cmInf.Create(out)
 		if err != nil {
-			return fmt.Errorf(
-				"cannot create '%s/%s' in namespace '%s': %v",
-				in.GetKind(),
+			log.Printf(
+				"cannot create 'configmap/%s' in namespace '%s': %v",
 				in.GetName(),
 				namespace,
 				err,
 			)
 		}
 	}
-	return nil
 }
 
-// copyAllOf copies all resources of the given kind.
-func (cd *ConfigurationDistributor) copyAllOf(group, version, resource string) error {
-	// Client for the resource in own namespace.
-	client := cd.dynamicClient.Resource(schema.GroupVersionResource{
-		Group:    group,
-		Version:  version,
-		Resource: resource,
-	}).Namespace(cd.namespace)
-	list, err := client.List(metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("cannot retrieve %s in %s: %v", resource, cd.namespace, err)
+// addSecretHandler handles the adding of Secrets.
+func (cd *ConfigurationDistributor) addSecretHandler(obj interface{}) {
+	if cd.rule == nil {
+		return
 	}
-	// Copy all found resources.
-	for _, item := range list.Items {
-		in := &item
-		if err = cd.copy(in, group, version, resource); err != nil {
-			return err
+	if cd.rule.Spec.Kind != "secret" && cd.rule.Spec.Kind != "both" {
+		return
+	}
+	scrt := obj.(*corev1.Secret)
+	if cd.rule.Spec.Selector != "" {
+		if scrt.GetLabels()["rule"] != cd.rule.Spec.Selector {
+			return
 		}
 	}
-	return nil
+	cd.copySecret(scrt)
+}
+
+// updateSecretHandler handles the updating of Secrets.
+func (cd *ConfigurationDistributor) updateSecretHandler(oldobj, newobj interface{}) {
+	if cd.rule == nil {
+		return
+	}
+	if cd.rule.Spec.Kind != "secret" && cd.rule.Spec.Kind != "both" {
+		return
+	}
+	scrt := newobj.(*corev1.Secret)
+	if cd.rule.Spec.Selector != "" {
+		if scrt.GetLabels()["rule"] != cd.rule.Spec.Selector {
+			return
+		}
+	}
+	cd.copySecret(scrt)
+}
+
+// copySecret copies the Secret to the namespaces configured in the distributor.
+func (cd *ConfigurationDistributor) copySecret(in *corev1.Secret) {
+	for _, namespace := range cd.rule.Spec.Namespaces {
+		scrtInf := cd.client.CoreV1().Secrets(namespace)
+		out := in.DeepCopy()
+		out.SetNamespace(namespace)
+
+		_, err := scrtInf.Create(out)
+		if err != nil {
+			log.Printf(
+				"cannot create 'secret/%s' in namespace '%s': %v",
+				in.GetName(),
+				namespace,
+				err,
+			)
+		}
+	}
 }
 
 // copyAll copies all config maps and secrets to the namespaces of the rule.
-func (cd *ConfigurationDistributor) copyAll() error {
-	err := cd.copyAllOf("core", "v1", "configmaps")
-	if err != nil {
-		return fmt.Errorf("cannot copy all configmaps: %v", err)
+func (cd *ConfigurationDistributor) copyAll() {
+	copyAllOf := func(resource string) error {
+		return nil
 	}
-	err = cd.copyAllOf("core", "v1", "secrets")
-	if err != nil {
-		return fmt.Errorf("cannot copy all secrets: %v", err)
+	if err := copyAllOf("configmap"); err != nil {
+		log.Printf("cannot copy all configmaps: %v", err)
 	}
-	return nil
+	if err := copyAllOf("secret"); err != nil {
+		log.Printf("cannot copy all configmaps: %v", err)
+	}
 }
 
 // EOF
