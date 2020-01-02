@@ -56,7 +56,7 @@ func main() {
 	codisv1alpha1.AddToScheme(scheme.Scheme)
 
 	log.Printf("Run the configuration distributor ...")
-	cd.Go()
+	cd.Run()
 
 	// Run forever.
 	select {}

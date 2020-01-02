@@ -79,8 +79,8 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 	return cd, nil
 }
 
-// Go executes the configuration distributor.
-func (cd *ConfigurationDistributor) Go() {
+// Run executes the configuration distributor.
+func (cd *ConfigurationDistributor) Run() {
 	cd.ruleInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    cd.mkAddRuleHandler(),
 		UpdateFunc: cd.mkUpdateRuleHandler(),
