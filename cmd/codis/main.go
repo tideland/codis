@@ -12,6 +12,7 @@ package main // import "tideland.dev/codis/cmd/codis"
 //--------------------
 
 import (
+	"context"
 	"flag"
 	"log"
 
@@ -38,7 +39,7 @@ func main() {
 		rulename   string
 	)
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "Address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&namespace, "namespace", "default", "Namespace of the managed configuration distributor rule.")
 	flag.StringVar(&rulename, "rulename", "default-rule", "Name of the managed configuration distributor rule.")
 	flag.Parse()
@@ -56,10 +57,7 @@ func main() {
 	codisv1alpha1.AddToScheme(scheme.Scheme)
 
 	log.Printf("Run the configuration distributor ...")
-	cd.Run()
-
-	// Run forever.
-	select {}
+	cd.Run(context.Background())
 }
 
 // EOF

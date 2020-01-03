@@ -12,6 +12,7 @@ package codis // import "tideland.dev/codis/pkg/codis"
 //--------------------
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -80,11 +81,11 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 }
 
 // Run executes the configuration distributor.
-func (cd *ConfigurationDistributor) Run() {
+func (cd *ConfigurationDistributor) Run(ctx context.Context) {
 	cd.ruleInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    cd.mkAddRuleHandler(),
-		UpdateFunc: cd.mkUpdateRuleHandler(),
-		DeleteFunc: cd.mkDeleteRuleHandler(),
+		AddFunc:    cd.addRuleHandler,
+		UpdateFunc: cd.updateRuleHandler,
+		DeleteFunc: cd.deleteRuleHandler,
 	})
 	cd.cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    cd.addConfigMapHandler,
@@ -98,41 +99,40 @@ func (cd *ConfigurationDistributor) Run() {
 	go cd.ruleInformer.Run(wait.NeverStop)
 	go cd.cmInformer.Run(wait.NeverStop)
 	go cd.scrtInformer.Run(wait.NeverStop)
-}
 
-// mkAddRuleHandler creates the handler for added rules.
-func (cd *ConfigurationDistributor) mkAddRuleHandler() func(obj interface{}) {
-	return func(obj interface{}) {
-		rule := obj.(*codisv1alpha1.ConfigurationDistributionRule)
-		if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
-			return
-		}
-		cd.rule = rule
-		cd.copyAll()
+	select {
+	case <-ctx.Done():
+		// Work is done.
 	}
 }
 
-// mkUpdateRuleHandler creates the handler for updated rules.
-func (cd *ConfigurationDistributor) mkUpdateRuleHandler() func(oldObj, newObj interface{}) {
-	return func(oldObj, newObj interface{}) {
-		rule := newObj.(*codisv1alpha1.ConfigurationDistributionRule)
-		if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
-			return
-		}
-		cd.rule = rule
-		cd.copyAll()
+// addRuleHandler handles the adding of rules.
+func (cd *ConfigurationDistributor) addRuleHandler(obj interface{}) {
+	rule := obj.(*codisv1alpha1.ConfigurationDistributionRule)
+	if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+		return
 	}
+	cd.rule = rule
+	cd.copyAll()
 }
 
-// mkDeleteRuleHandler creates the handler for deleted rules.
-func (cd *ConfigurationDistributor) mkDeleteRuleHandler() func(obj interface{}) {
-	return func(obj interface{}) {
-		rule := obj.(*codisv1alpha1.ConfigurationDistributionRule)
-		if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
-			return
-		}
-		cd.rule = nil
+// updateRuleHandler handles the updating of rules.
+func (cd *ConfigurationDistributor) updateRuleHandler(oldobj, newobj interface{}) {
+	rule := newobj.(*codisv1alpha1.ConfigurationDistributionRule)
+	if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+		return
 	}
+	cd.rule = rule
+	cd.copyAll()
+}
+
+// deleteRuleHandler handles the deleting of rules.
+func (cd *ConfigurationDistributor) deleteRuleHandler(obj interface{}) {
+	rule := obj.(*codisv1alpha1.ConfigurationDistributionRule)
+	if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+		return
+	}
+	cd.rule = nil
 }
 
 // addConfigMapHandler handles the adding of ConfigMaps.
