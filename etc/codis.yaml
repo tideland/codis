@@ -21,9 +21,9 @@ spec:
     openAPIV3Schema:
       type: object
       properties:
-        kind:
+        rulekind:
           type: string
-          pattern: '^(configmap|secret|both)$'
+          pattern: '^(configmap)|(secret)|(both)$'
         namespaces:
           type: array
           items:

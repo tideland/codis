@@ -112,17 +112,23 @@ func (cd *ConfigurationDistributor) addRuleHandler(obj interface{}) {
 	if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
 		return
 	}
+	log.Printf("adding rule '%s' in namespace '%s' ...", rule.GetName(), rule.GetNamespace())
 	cd.rule = rule
 	cd.copyAll()
 }
 
 // updateRuleHandler handles the updating of rules.
 func (cd *ConfigurationDistributor) updateRuleHandler(oldobj, newobj interface{}) {
-	rule := newobj.(*codisv1alpha1.ConfigurationDistributionRule)
-	if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
+	oldrule := oldobj.(*codisv1alpha1.ConfigurationDistributionRule)
+	newrule := newobj.(*codisv1alpha1.ConfigurationDistributionRule)
+	if newrule.GetNamespace() != cd.namespace || newrule.GetName() != cd.rulename {
 		return
 	}
-	cd.rule = rule
+	if oldrule.GetResourceVersion() == newrule.GetResourceVersion() {
+		return
+	}
+	log.Printf("updating rule '%s' in namespace '%s' ...", newrule.GetName(), newrule.GetNamespace())
+	cd.rule = newrule
 	cd.copyAll()
 }
 
@@ -132,6 +138,7 @@ func (cd *ConfigurationDistributor) deleteRuleHandler(obj interface{}) {
 	if rule.GetNamespace() != cd.namespace || rule.GetName() != cd.rulename {
 		return
 	}
+	log.Printf("deleting rule '%s' in namespace '%s' ...", rule.GetName(), rule.GetNamespace())
 	cd.rule = nil
 }
 
@@ -140,7 +147,7 @@ func (cd *ConfigurationDistributor) addConfigMapHandler(obj interface{}) {
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Kind != "configmap" && cd.rule.Spec.Kind != "both" {
+	if cd.rule.Spec.Rulekind != "configmap" && cd.rule.Spec.Rulekind != "both" {
 		return
 	}
 	cm := obj.(*corev1.ConfigMap)
@@ -157,16 +164,20 @@ func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interf
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Kind != "configmap" && cd.rule.Spec.Kind != "both" {
+	if cd.rule.Spec.Rulekind != "configmap" && cd.rule.Spec.Rulekind != "both" {
 		return
 	}
-	cm := newobj.(*corev1.ConfigMap)
+	oldcm := oldobj.(*corev1.ConfigMap)
+	newcm := newobj.(*corev1.ConfigMap)
+	if oldcm.GetResourceVersion() == newcm.GetResourceVersion() {
+		return
+	}
 	if cd.rule.Spec.Selector != "" {
-		if cm.GetLabels()["rule"] != cd.rule.Spec.Selector {
+		if newcm.GetLabels()["rule"] != cd.rule.Spec.Selector {
 			return
 		}
 	}
-	cd.applyConfigMap(cm, false)
+	cd.applyConfigMap(newcm, false)
 }
 
 // applyConfigMap applies the ConfigMap to the namespaces configured in the distributor.
@@ -176,6 +187,8 @@ func (cd *ConfigurationDistributor) applyConfigMap(in *corev1.ConfigMap, create 
 		cmInf := cd.client.CoreV1().ConfigMaps(namespace)
 		out := in.DeepCopy()
 		out.SetNamespace(namespace)
+		out.SetResourceVersion("")
+		out.SetUID("")
 
 		var err error
 		if create {
@@ -199,7 +212,7 @@ func (cd *ConfigurationDistributor) addSecretHandler(obj interface{}) {
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Kind != "secret" && cd.rule.Spec.Kind != "both" {
+	if cd.rule.Spec.Rulekind != "secret" && cd.rule.Spec.Rulekind != "both" {
 		return
 	}
 	scrt := obj.(*corev1.Secret)
@@ -216,16 +229,20 @@ func (cd *ConfigurationDistributor) updateSecretHandler(oldobj, newobj interface
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Kind != "secret" && cd.rule.Spec.Kind != "both" {
+	if cd.rule.Spec.Rulekind != "secret" && cd.rule.Spec.Rulekind != "both" {
 		return
 	}
-	scrt := newobj.(*corev1.Secret)
+	oldscrt := oldobj.(*corev1.Secret)
+	newscrt := newobj.(*corev1.Secret)
+	if oldscrt.GetResourceVersion() == newscrt.GetResourceVersion() {
+		return
+	}
 	if cd.rule.Spec.Selector != "" {
-		if scrt.GetLabels()["rule"] != cd.rule.Spec.Selector {
+		if newscrt.GetLabels()["rule"] != cd.rule.Spec.Selector {
 			return
 		}
 	}
-	cd.applySecret(scrt, false)
+	cd.applySecret(newscrt, false)
 }
 
 // applySecret applies the Secret to the namespaces configured in the distributor.
@@ -235,6 +252,8 @@ func (cd *ConfigurationDistributor) applySecret(in *corev1.Secret, create bool) 
 		scrtInf := cd.client.CoreV1().Secrets(namespace)
 		out := in.DeepCopy()
 		out.SetNamespace(namespace)
+		out.SetResourceVersion("")
+		out.SetUID("")
 
 		var err error
 		if create {

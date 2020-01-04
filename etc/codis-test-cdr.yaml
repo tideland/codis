@@ -1,0 +1,11 @@
+apiVersion: k8s.tideland.dev/v1alpha1
+kind: ConfigurationDistributionRule
+metadata:
+  name: codis-test
+  namespace: codis-test
+spec:
+  rulekind: both
+  selector: test
+  namespaces:
+    - default
+    - another-test
