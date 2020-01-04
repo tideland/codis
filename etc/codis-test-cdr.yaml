@@ -4,7 +4,7 @@ metadata:
   name: codis-test
   namespace: codis-test
 spec:
-  rulekind: both
+  mode: both
   selector: test
   namespaces:
     - default

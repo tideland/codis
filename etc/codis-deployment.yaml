@@ -45,13 +45,4 @@ spec:
       - name: codis
         image: themue/codis
         imagePullPolicy: Always
-        env:
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: RULE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
       serviceAccountName: codis-acc

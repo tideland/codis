@@ -147,7 +147,7 @@ func (cd *ConfigurationDistributor) addConfigMapHandler(obj interface{}) {
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Rulekind != "configmap" && cd.rule.Spec.Rulekind != "both" {
+	if cd.rule.Spec.Mode != "configmap" && cd.rule.Spec.Mode != "both" {
 		return
 	}
 	cm := obj.(*corev1.ConfigMap)
@@ -164,7 +164,7 @@ func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interf
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Rulekind != "configmap" && cd.rule.Spec.Rulekind != "both" {
+	if cd.rule.Spec.Mode != "configmap" && cd.rule.Spec.Mode != "both" {
 		return
 	}
 	oldcm := oldobj.(*corev1.ConfigMap)
@@ -212,7 +212,7 @@ func (cd *ConfigurationDistributor) addSecretHandler(obj interface{}) {
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Rulekind != "secret" && cd.rule.Spec.Rulekind != "both" {
+	if cd.rule.Spec.Mode != "secret" && cd.rule.Spec.Mode != "both" {
 		return
 	}
 	scrt := obj.(*corev1.Secret)
@@ -229,7 +229,7 @@ func (cd *ConfigurationDistributor) updateSecretHandler(oldobj, newobj interface
 	if cd.rule == nil {
 		return
 	}
-	if cd.rule.Spec.Rulekind != "secret" && cd.rule.Spec.Rulekind != "both" {
+	if cd.rule.Spec.Mode != "secret" && cd.rule.Spec.Mode != "both" {
 		return
 	}
 	oldscrt := oldobj.(*corev1.Secret)

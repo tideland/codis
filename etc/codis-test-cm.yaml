@@ -4,7 +4,6 @@ data:
   foo: "bar"
 kind: ConfigMap
 metadata:
-  creationTimestamp: "2020-01-04T20:14:49Z"
   name: codis-test-config
   namespace: codis-test
   labels:

@@ -54,7 +54,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 // ConfigurationDistributionRuleSpec specifies one configuration distribution rule.
 type ConfigurationDistributionRuleSpec struct {
-	Rulekind   string   `json:"rulekind"`
+	Mode       string   `json:"mode"`
 	Selector   string   `json:"selector"`
 	Namespaces []string `json:"namespaces"`
 }
@@ -73,7 +73,7 @@ func (in *ConfigurationDistributionRule) DeepCopyInto(out *ConfigurationDistribu
 	out.TypeMeta = in.TypeMeta
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec = ConfigurationDistributionRuleSpec{
-		Rulekind:   in.Spec.Rulekind,
+		Mode:       in.Spec.Mode,
 		Selector:   in.Spec.Selector,
 		Namespaces: make([]string, len(in.Spec.Namespaces)),
 	}
