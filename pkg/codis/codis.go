@@ -151,6 +151,9 @@ func (cd *ConfigurationDistributor) addConfigMapHandler(obj interface{}) {
 		return
 	}
 	cm := obj.(*corev1.ConfigMap)
+	if cm.GetNamespace() != cd.namespace {
+		return
+	}
 	if cd.rule.Spec.Selector != "" {
 		if cm.GetLabels()["rule"] != cd.rule.Spec.Selector {
 			return
@@ -169,7 +172,7 @@ func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interf
 	}
 	oldcm := oldobj.(*corev1.ConfigMap)
 	newcm := newobj.(*corev1.ConfigMap)
-	if oldcm.GetResourceVersion() == newcm.GetResourceVersion() {
+	if newcm.GetNamespace() != cd.namespace || oldcm.GetResourceVersion() == newcm.GetResourceVersion() {
 		return
 	}
 	if cd.rule.Spec.Selector != "" {
@@ -216,6 +219,9 @@ func (cd *ConfigurationDistributor) addSecretHandler(obj interface{}) {
 		return
 	}
 	scrt := obj.(*corev1.Secret)
+	if scrt.GetNamespace() != cd.namespace {
+		return
+	}
 	if cd.rule.Spec.Selector != "" {
 		if scrt.GetLabels()["rule"] != cd.rule.Spec.Selector {
 			return
@@ -234,7 +240,7 @@ func (cd *ConfigurationDistributor) updateSecretHandler(oldobj, newobj interface
 	}
 	oldscrt := oldobj.(*corev1.Secret)
 	newscrt := newobj.(*corev1.Secret)
-	if oldscrt.GetResourceVersion() == newscrt.GetResourceVersion() {
+	if newscrt.GetNamespace() != cd.namespace || oldscrt.GetResourceVersion() == newscrt.GetResourceVersion() {
 		return
 	}
 	if cd.rule.Spec.Selector != "" {
