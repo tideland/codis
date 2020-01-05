@@ -150,6 +150,7 @@ func (cd *ConfigurationDistributor) addConfigMapHandler(obj interface{}) {
 	if cd.rule.Spec.Mode != "configmap" && cd.rule.Spec.Mode != "both" {
 		return
 	}
+	log.Printf("DEBUG addConfigMapHandler: %v", obj)
 	cm := obj.(*corev1.ConfigMap)
 	if cd.rule.Spec.Selector != "" {
 		if cm.GetLabels()["rule"] != cd.rule.Spec.Selector {
@@ -167,6 +168,7 @@ func (cd *ConfigurationDistributor) updateConfigMapHandler(oldobj, newobj interf
 	if cd.rule.Spec.Mode != "configmap" && cd.rule.Spec.Mode != "both" {
 		return
 	}
+	log.Printf("DEBUG updateConfigMapHandler: %v / %v", oldobj, newobj)
 	oldcm := oldobj.(*corev1.ConfigMap)
 	newcm := newobj.(*corev1.ConfigMap)
 	if oldcm.GetResourceVersion() == newcm.GetResourceVersion() {

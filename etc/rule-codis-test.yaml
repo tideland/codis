@@ -1,11 +1,11 @@
 apiVersion: k8s.tideland.dev/v1alpha1
 kind: ConfigurationDistributionRule
 metadata:
-  name: codis-test
-  namespace: codis-test
+  name: cdr-codis-test
+  namespace: ns-codis-test
 spec:
   mode: both
-  selector: test
+  selector: testing
   namespaces:
     - default
     - another-test

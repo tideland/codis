@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-codis-test
+  namespace: ns-codis-test
+  labels:
+    rule: testing
+data:
+  alpha: "1"
+  bravo: "2"
+  charly: "3"

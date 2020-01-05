@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: codis-acc
+  name: sa-codis
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
@@ -25,7 +25,7 @@ roleRef:
   name: codis
 subjects:
 - kind: ServiceAccount
-  name: codis-acc
+  name: svc-codis
   namespace: default
 ---
 apiVersion: apps/v1
@@ -45,4 +45,9 @@ spec:
       - name: codis
         image: themue/codis
         imagePullPolicy: Always
-      serviceAccountName: codis-acc
+        env:
+        - name: NAMESPACE
+          value: "ns-codis-test"
+        - name: RULENAME
+          value: "cdr-codis-test"
+      serviceAccountName: sa-codis

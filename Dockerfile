@@ -17,8 +17,9 @@ RUN cd /app/cmd/codis && go build ./...
 FROM alpine AS production
 WORKDIR /usr/bin
 COPY --from=build /app/cmd/codis/codis .
-ENV NAMESPACE=default RULENAME=default-rule
-ENTRYPOINT ["/usr/bin/codis"]
+ENV NAMESPACE "ns-default"
+ENV RULENAME "cdr-default"
+ENTRYPOINT ["/usr/bin/codis", "--namespace=${NAMESPACE}", "--rulename=${RULENAME}"]
 
 ##
 ## EOF
