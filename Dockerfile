@@ -10,7 +10,6 @@ ENV CGO_ENABLED=0
 WORKDIR /app
 COPY . /app
 RUN cd /app/cmd/codis && go build ./...
-
 ##
 ## Build runtime image.
 ##
@@ -18,9 +17,8 @@ FROM alpine AS production
 WORKDIR /usr/bin
 COPY --from=build /app/cmd/codis/codis .
 ENV NAMESPACE "ns-default"
-ENV RULENAME "cdr-default"
-ENTRYPOINT ["/usr/bin/codis", "--namespace=${NAMESPACE}", "--rulename=${RULENAME}"]
-
+ENV RULENAME "rule-default"
+ENTRYPOINT /usr/bin/codis --namespace=${NAMESPACE} --rulename=${RULENAME}
 ##
 ## EOF
 ##
