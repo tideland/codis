@@ -1,7 +1,7 @@
 apiVersion: k8s.tideland.dev/v1alpha1
 kind: ConfigurationDistributionRule
 metadata:
-  name: cdr-codis-test
+  name: rule-codis-test
   namespace: ns-codis-test
 spec:
   mode: both
