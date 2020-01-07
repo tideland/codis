@@ -95,10 +95,14 @@ func (cd *ConfigurationDistributor) Run(ctx context.Context) {
 		AddFunc:    cd.addSecretHandler,
 		UpdateFunc: cd.updateSecretHandler,
 	})
+	cd.nsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: cd.addNamespaceHandler,
+	})
 
 	go cd.ruleInformer.Run(wait.NeverStop)
 	go cd.cmInformer.Run(wait.NeverStop)
 	go cd.scrtInformer.Run(wait.NeverStop)
+	go cd.nsInformer.Run(wait.NeverStop)
 
 	select {
 	case <-ctx.Done():
@@ -289,6 +293,32 @@ func (cd *ConfigurationDistributor) copyAll() {
 	if err := copyAllOf("secret"); err != nil {
 		log.Printf("cannot copy all configmaps: %v", err)
 	}
+}
+
+// addNamespaceHandler handles the adding of Namespaces.
+func (cd *ConfigurationDistributor) addNamespaceHandler(obj interface{}) {
+	if cd.rule == nil {
+		return
+	}
+	ns := obj.(*corev1.Namespace)
+	for _, namespace := range cd.rule.Spec.Namespaces {
+		if ns.GetName() == namespace {
+			// Namespace in rule.
+			cd.applyMatchingConfigMaps(ns.GetName())
+			cd.applyMatchingSecrets(ns.GetName())
+			return
+		}
+	}
+}
+
+// applyMatchingConfigMaps applies the matching ConfigMaps in own Namespace to
+// the given Namespace.
+func (cd *ConfigurationDistributor) applyMatchingConfigMaps(namespace string) {
+}
+
+// applyMatchingSecrets applies the matching Secrets in own Namespace to
+// the given Namespace.
+func (cd *ConfigurationDistributor) applyMatchingSecrets(namespace string) {
 }
 
 // EOF
