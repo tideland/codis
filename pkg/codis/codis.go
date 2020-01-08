@@ -282,19 +282,6 @@ func (cd *ConfigurationDistributor) applySecret(in *corev1.Secret, create bool) 
 	}
 }
 
-// copyAll copies all config maps and secrets to the namespaces of the rule.
-func (cd *ConfigurationDistributor) copyAll() {
-	copyAllOf := func(resource string) error {
-		return nil
-	}
-	if err := copyAllOf("configmap"); err != nil {
-		log.Printf("cannot copy all configmaps: %v", err)
-	}
-	if err := copyAllOf("secret"); err != nil {
-		log.Printf("cannot copy all configmaps: %v", err)
-	}
-}
-
 // addNamespaceHandler handles the adding of Namespaces.
 func (cd *ConfigurationDistributor) addNamespaceHandler(obj interface{}) {
 	if cd.rule == nil {

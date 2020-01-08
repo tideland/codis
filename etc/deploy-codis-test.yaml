@@ -9,6 +9,9 @@ kind: ClusterRole
 metadata:
   name: codis
 rules:
+  - apiGroups: ["k8s.tideland.dev"]
+    resources: ["configurationdistributionrules"]
+    verbs: ["get", "list", "update", "watch"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "watch", "list"]
@@ -33,6 +36,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: codis
+  namespace: ns-codis-test
 spec:
   selector:
     matchLabels:
