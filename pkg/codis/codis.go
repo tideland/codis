@@ -17,7 +17,7 @@ import (
 	"log"
 	"time"
 
-	codisv1alpha1 "tideland.dev/codis/pkg/v1alpha1"
+	codisv1alpha1 "tideland.dev/codis/api/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -306,6 +306,10 @@ func (cd *ConfigurationDistributor) applyMatchingConfigMaps(namespace string) {
 // applyMatchingSecrets applies the matching Secrets in own Namespace to
 // the given Namespace.
 func (cd *ConfigurationDistributor) applyMatchingSecrets(namespace string) {
+}
+
+// copyAll copies everything according to the rule.
+func (cd *ConfigurationDistributor) copyAll() {
 }
 
 // EOF
