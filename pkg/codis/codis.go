@@ -301,11 +301,13 @@ func (cd *ConfigurationDistributor) addNamespaceHandler(obj interface{}) {
 // applyMatchingConfigMaps applies the matching ConfigMaps in own Namespace to
 // the given Namespace.
 func (cd *ConfigurationDistributor) applyMatchingConfigMaps(namespace string) {
+	// TODO Search ConfigMaps and copy those.
 }
 
 // applyMatchingSecrets applies the matching Secrets in own Namespace to
 // the given Namespace.
 func (cd *ConfigurationDistributor) applyMatchingSecrets(namespace string) {
+	// TODO Search Secrets and copy those.
 }
 
 // EOF
