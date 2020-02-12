@@ -17,7 +17,7 @@ import (
 	"log"
 	"time"
 
-	codisv1alpha1 "tideland.dev/codis/pkg/v1alpha1"
+	codisv1alpha1 "tideland.dev/codis/api/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +73,7 @@ func New(config *rest.Config, namespace, rulename string) (*ConfigurationDistrib
 	cd.client = client
 	// Init informers.
 	cd.ruleInformer = codisv1alpha1.NewRuleInformerWithInterface(cd.ruleInterface).Informer()
-	factory := informers.NewSharedInformerFactory(cd.client, time.Second*30)
+	factory := informers.NewSharedInformerFactory(cd.client, 30*time.Second)
 	cd.cmInformer = factory.Core().V1().ConfigMaps().Informer()
 	cd.scrtInformer = factory.Core().V1().Secrets().Informer()
 	cd.nsInformer = factory.Core().V1().Namespaces().Informer()
@@ -118,7 +118,7 @@ func (cd *ConfigurationDistributor) addRuleHandler(obj interface{}) {
 	}
 	log.Printf("adding rule '%s' in namespace '%s' ...", rule.GetName(), rule.GetNamespace())
 	cd.rule = rule
-	cd.copyAll()
+	cd.distributeAll()
 }
 
 // updateRuleHandler handles the updating of rules.
@@ -133,7 +133,7 @@ func (cd *ConfigurationDistributor) updateRuleHandler(oldobj, newobj interface{}
 	}
 	log.Printf("updating rule '%s' in namespace '%s' ...", newrule.GetName(), newrule.GetNamespace())
 	cd.rule = newrule
-	cd.copyAll()
+	cd.distributeAll()
 }
 
 // deleteRuleHandler handles the deleting of rules.
@@ -144,6 +144,20 @@ func (cd *ConfigurationDistributor) deleteRuleHandler(obj interface{}) {
 	}
 	log.Printf("deleting rule '%s' in namespace '%s' ...", rule.GetName(), rule.GetNamespace())
 	cd.rule = nil
+}
+
+// distributeAll copies all config maps and secrets to the namespaces of the rule.
+func (cd *ConfigurationDistributor) distributeAll() {
+	distributeAllOf := func(resource string) error {
+		// TODO
+		return nil
+	}
+	if err := distributeAllOf("configmap"); err != nil {
+		log.Printf("cannot copy all configmaps: %v", err)
+	}
+	if err := distributeAllOf("secret"); err != nil {
+		log.Printf("cannot copy all configmaps: %v", err)
+	}
 }
 
 // addConfigMapHandler handles the adding of ConfigMaps.

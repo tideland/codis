@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license
 
-package v1alpha1 // import "tideland.dev/codis/pkg/v1alpha1"
+package v1alpha1 // import "tideland.dev/codis/api/v1alpha1"
 
 //--------------------
 // IMPORTS

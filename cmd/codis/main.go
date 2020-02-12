@@ -16,8 +16,8 @@ import (
 	"flag"
 	"log"
 
+	codisv1alpha1 "tideland.dev/codis/api/v1alpha1"
 	"tideland.dev/codis/pkg/codis"
-	codisv1alpha1 "tideland.dev/codis/pkg/v1alpha1"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
