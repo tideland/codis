@@ -1,7 +1,7 @@
 ##
 ## Build codis binary.
 ##
-FROM golang:1.13 AS build
+FROM golang:1.15 AS build
 RUN mkdir /gocache
 ENV GOCACHE /gocache
 ENV GO111MODULE=on
